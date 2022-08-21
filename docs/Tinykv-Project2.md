@@ -41,7 +41,7 @@ type Raft struct {
 	// the leader id
 	Lead uint64
 
-	// heartbeat interval, should send
+	// heartbeat interval， should send
 	heartbeatTimeout int
 	// baseline of election interval
 	electionTimeout int
@@ -61,7 +61,7 @@ type Raft struct {
 1. 几个时间相关的量.注释中已经说明了这四个量的含义，但是我最开始在将这些值初始化成多少的时候有一点疑惑，因为论文中明确要求了选举时间应该是随机的.后来看了测试函数，发现经过两个electiontimeout一定会发生一次选举，所以只需要根据这个去设置就行，我这里是将初始的electionElapsed设置成了一个`[-eletiontimeout，0]`之间的随机数
 2. `msgs`，这个数组就是用来存放一次Step之后产生的一系列新的信息，等待被处理
 3. `Prs`，这个数组存放了论文中提到的nextIndex和matchIndex，我们也需要通过这个数组去向集群中的其他节点发送信息
-4. `label`，这个是我自己添加的一个量，因为在测试的时候发现会出现"瓜分"的情况，也就是一次选举没有Leader产生，这里就是作为一个标记，表示当前这次选举是否是因为瓜分产生的，如果是的话可以直接更新这个Candidate的任期.
+4. `label`，这个是我自己添加的一个量，因为在测试的时候发现会出现"瓜分"的情况，也就是一次选举没有Leader产生，这里就是作为一个标记，表示当前这次选举是否是因为瓜分产生的，如果是的话可以直接更新这个Candidate的任期，不过后来排查bug的时候发现完全不需要多用一个label，只需要在每次选举的时候调用becomeCandidate更新任期就行了
 
 ​	下面看一下`RaftLog`结构体
 
@@ -81,23 +81,24 @@ type RaftLog struct {
 
 	// log entries with index <= stabled are persisted to storage.
 	// It is used to record the logs that are not persisted by storage yet.
-	// Everytime handling `Ready`, the unstabled logs will be included.
+	// Everytime handling `Ready`， the unstabled logs will be included.
 	stabled uint64
 
 	// all entries that have not yet compact.
 	entries []pb.Entry
 
-	// the incoming unstable snapshot, if any.
+	// the incoming unstable snapshot， if any.
 	// (Used in 2C)
 	pendingSnapshot *pb.Snapshot
 
 	// Your Data Here (2A).
+    FirstIndex uint64
 }
 type Entry struct {
-	EntryType            EntryType `protobuf:"varint,1,opt,name=entry_type,json=entryType,proto3,enum=eraftpb.EntryType" json:"entry_type,omitempty"`
-	Term                 uint64    `protobuf:"varint,2,opt,name=term,proto3" json:"term,omitempty"`
-	Index                uint64    `protobuf:"varint,3,opt,name=index,proto3" json:"index,omitempty"`
-	Data                 []byte    `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
+	EntryType            EntryType `protobuf:"varint，1，opt，name=entry_type，json=entryType，proto3，enum=eraftpb.EntryType" json:"entry_type，omitempty"`
+	Term                 uint64    `protobuf:"varint，2，opt，name=term，proto3" json:"term，omitempty"`
+	Index                uint64    `protobuf:"varint，3，opt，name=index，proto3" json:"index，omitempty"`
+	Data                 []byte    `protobuf:"bytes，4，opt，name=data，proto3" json:"data，omitempty"`
 	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
 	XXX_unrecognized     []byte    `json:"-"`
 	XXX_sizecache        int32     `json:"-"`
@@ -159,7 +160,7 @@ type Entry struct {
 
 ​	最后进行测试，运行结果如下
 
-![image-20220809103812981](https://cdn.jsdelivr.net/gh/ysjyx7/img@main/image-20220809103812981.png)
+
 
 ![image-20220809103836500](https://cdn.jsdelivr.net/gh/ysjyx7/img@main/image-20220809103836500.png)
 
@@ -188,7 +189,7 @@ type Entry struct {
 > 首先在`./kv`目录下的main函数中，调用了`./kv/storage/raft_storage`中的`start`函数启动`RaftStorage`，其封装了`RaftStore`，RaftStore中又包含了一系列`RaftWorker`，RaftStore主要就是启动了这些Worker，同时载入Peers.在启动Worker之后，就开始调用RaftWorker的`run`方法，也就是文档中提到过的很重要的一个方法，如下
 >
 > ```go
-> func (rw *raftWorker) run(closeCh <-chan struct{}, wg *sync.WaitGroup) {
+> func (rw *raftWorker) run(closeCh <-chan struct{}， wg *sync.WaitGroup) {
 > 	defer wg.Done()
 > 	var msgs []message.Msg
 > 	for {
@@ -197,22 +198,22 @@ type Entry struct {
 > 		case <-closeCh:
 > 			return
 > 		case msg := <-rw.raftCh:
-> 			msgs = append(msgs, msg)
+> 			msgs = append(msgs， msg)
 > 		}
 > 		pending := len(rw.raftCh)
 > 		for i := 0; i < pending; i++ {
-> 			msgs = append(msgs, <-rw.raftCh)
+> 			msgs = append(msgs， <-rw.raftCh)
 > 		}
 > 		peerStateMap := make(map[uint64]*peerState)
-> 		for _, msg := range msgs {
-> 			peerState := rw.getPeerState(peerStateMap, msg.RegionID)
+> 		for _， msg := range msgs {
+> 			peerState := rw.getPeerState(peerStateMap， msg.RegionID)
 > 			if peerState == nil {
 > 				continue
 > 			}
-> 			newPeerMsgHandler(peerState.peer, rw.ctx).HandleMsg(msg)
+> 			newPeerMsgHandler(peerState.peer， rw.ctx).HandleMsg(msg)
 > 		}
-> 		for _, peerState := range peerStateMap {
-> 			newPeerMsgHandler(peerState.peer, rw.ctx).HandleRaftReady()
+> 		for _， peerState := range peerStateMap {
+> 			newPeerMsgHandler(peerState.peer， rw.ctx).HandleRaftReady()
 > 		}
 > 	}
 > }
@@ -289,16 +290,16 @@ type Entry struct {
 
    ```go
    type Snapshot struct {
-   	Data                 []byte            `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
-   	Metadata             *SnapshotMetadata `protobuf:"bytes,2,opt,name=metadata" json:"metadata,omitempty"`
+   	Data                 []byte            `protobuf:"bytes，1，opt，name=data，proto3" json:"data，omitempty"`
+   	Metadata             *SnapshotMetadata `protobuf:"bytes，2，opt，name=metadata" json:"metadata，omitempty"`
    	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
    	XXX_unrecognized     []byte            `json:"-"`
    	XXX_sizecache        int32             `json:"-"`
    }
    type SnapshotMetadata struct {
-   	ConfState            *ConfState `protobuf:"bytes,1,opt,name=conf_state,json=confState" json:"conf_state,omitempty"`
-   	Index                uint64     `protobuf:"varint,2,opt,name=index,proto3" json:"index,omitempty"`
-   	Term                 uint64     `protobuf:"varint,3,opt,name=term,proto3" json:"term,omitempty"`
+   	ConfState            *ConfState `protobuf:"bytes，1，opt，name=conf_state，json=confState" json:"conf_state，omitempty"`
+   	Index                uint64     `protobuf:"varint，2，opt，name=index，proto3" json:"index，omitempty"`
+   	Term                 uint64     `protobuf:"varint，3，opt，name=term，proto3" json:"term，omitempty"`
    	XXX_NoUnkeyedLiteral struct{}   `json:"-"`
    	XXX_unrecognized     []byte     `json:"-"`
    	XXX_sizecache        int32      `json:"-"`
@@ -310,19 +311,18 @@ type Entry struct {
    下面看一下handleSnapshot的实现
 
    1. 首先看信息的任期是否小于接收者的任期号，如果是就直接拒绝操作，然后再看一下元数据中的Index和接收者已提交日志索引的大小关系，如果小于等于的话也直接拒绝，因为这说明，当前节点不需要这个快照同步
-   2. 然后我们开始利用这个Snapshot进行一系列更新，主要的更新其实都在RaftLog这一块，更新一下各种类型的索引，以及更新一下RaftLog中的Entries这个数组，如果元数据的Index大于RaftLog的LastIndex，直接将Entries置为空即可，否则如果元数据的Index比firstindex大，就取原本数组的一部分即可.另外，这里也有一个小坑，就是如果此时RaftLog中的Entries数组为空的话，就append进去一个新的量，这个是测试样例有这个要求.
+   2. 然后我们开始利用这个Snapshot进行一系列更新，主要的更新其实都在RaftLog这一块，更新一下各种类型的索引，以及更新一下RaftLog中的Entries这个数组，如果元数据的Index大于RaftLog的LastIndex，直接将Entries置为空即可，否则如果元数据的Index比firstindex大，就取原本数组的一部分即可。另外，这里也有一个小坑，就是如果此时RaftLog中的Entries数组为空的话，就append进去一个新的量，这个是测试样例有这个要求.
    3. 最后，利用元数据中的ConfState更新当前节点的集群配置信息
 
    感觉这里相比于论文中的InstallSnapshotRPC，要少了很多东西
 
 2. 接下来需要考虑另外一个问题，也就是**什么时候发送Snapshot**，Snapshot本身也是去进行日志同步的一个东西，之前我们都是用AppendRPC来进行同步，也就是sendAppend那里，现在由于我们会进行日志压缩，如果我们没能找到要发送的日志，那就只能把整个快照发送过去让对方进行同步了，所以需要对sendAppend函数进行一些修改，也就是如果最开始我们没能根据PrevLogIndex找到对应的Term的话，就需要发送快照.也就是说我们需要对返回的error进行判断来决定是否需要发送快照即可
 
-3. 然后，我们需要对之前实现过的RaftLog相关方法进行修改.
+3. 然后，我们需要对之前实现过的RaftLog相关方法进行修改。
 
-   - `FirstIndex`，由于之前没有快照，所以原则上不管是调用storage的firstindex来获取index还是用entris[0].Index作为FirstIndex都是可以的，但是现在不行了，所以可以封装一个FirstIndex方法
    - `Term`，如果直接用storage的Term返回的err的话，看它的实现似乎很大部分都是返回的`ErrUnavailable`，所以这里我们需要自己加一个判断逻辑，看看是否有快照，有的话基本就可以将err更改成`ErrCompacted`
    - `maybeCompact`，这个函数我最开始就没写，好像也没测出什么问题，其实也就是把一部分肯定没有用的日志删掉就行了
-
+   
 4. 最后，还需要更新RaftNode的相关逻辑，主要就是加入了对于快照的判断和更新
 
 ​	接下来看一下如何对RaftStore进行修改，先来简单根据任务书看一下相关的工作流程
